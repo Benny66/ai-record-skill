@@ -105,27 +105,33 @@ def compute_stats(entries: list[dict]) -> dict:
 
 
 def find_duplicates(entries: list[dict]) -> list[tuple]:
-    """检查潜在重复条目（基于标题相似度）。"""
+    """检查潜在重复条目（基于 bigram 词级 Jaccard 相似度）。"""
     duplicates = []
-    titles = [(e["id"], e["title"].lower()) for e in entries]
+    
+    def to_bigrams(text: str) -> set:
+        """将文本转为 bigram 集合，用于中文相似度计算。"""
+        # 清理文本，去除标点和空格
+        clean = re.sub(r'[^\w]', '', text.lower())
+        if len(clean) < 2:
+            return {clean} if clean else set()
+        return {clean[i:i+2] for i in range(len(clean) - 1)}
 
-    for i in range(len(titles)):
-        for j in range(i + 1, len(titles)):
-            id_a, title_a = titles[i]
-            id_b, title_b = titles[j]
-            # 简单相似度：共同词占比
-            words_a = set(title_a)
-            words_b = set(title_b)
-            if not words_a or not words_b:
+    for i in range(len(entries)):
+        for j in range(i + 1, len(entries)):
+            bigrams_a = to_bigrams(entries[i]["title"])
+            bigrams_b = to_bigrams(entries[j]["title"])
+            if not bigrams_a or not bigrams_b:
                 continue
-            overlap = len(words_a & words_b) / min(len(words_a), len(words_b))
-            if overlap > 0.7:
+            intersection = len(bigrams_a & bigrams_b)
+            union = len(bigrams_a | bigrams_b)
+            similarity = intersection / union if union > 0 else 0
+            if similarity > 0.5:
                 duplicates.append({
-                    "entry_a": id_a,
+                    "entry_a": entries[i]["id"],
                     "title_a": entries[i]["title"],
-                    "entry_b": id_b,
+                    "entry_b": entries[j]["id"],
                     "title_b": entries[j]["title"],
-                    "similarity": round(overlap, 2),
+                    "similarity": round(similarity, 2),
                 })
 
     return duplicates
