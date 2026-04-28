@@ -40,11 +40,15 @@ def parse_handbook(filepath: str) -> list[dict]:
     matches = re.findall(pattern, content, re.DOTALL)
 
     for exp_id, title, stars, source, body in matches:
+        type_match = re.search(r"\*\*类型\*\*：`?([^`\n]+)`?", body)
+        cat_match = re.search(r"\*\*场景分类\*\*：([^\n]+)", body)
         entries.append({
             "id": exp_id,
             "title": title.strip(),
             "stars": stars.strip() if stars else "",
             "source": source.strip() if source else "",
+            "type": type_match.group(1).strip() if type_match else "",
+            "category": cat_match.group(1).strip() if cat_match else "",
             "content": body.strip(),
         })
 
@@ -57,11 +61,13 @@ def parse_handbook(filepath: str) -> list[dict]:
         if not any(e["id"] == exp_id for e in entries):
             stars_match = re.search(r"\*\*可复用度\*\*：([★☆]+)", body)
             type_match = re.search(r"\*\*类型\*\*：`([^`]+)`", body)
+            cat_match = re.search(r"\*\*场景分类\*\*：([^\n]+)", body)
             entries.append({
                 "id": exp_id,
                 "title": title.strip(),
                 "stars": stars_match.group(1) if stars_match else "",
                 "type": type_match.group(1) if type_match else "",
+                "category": cat_match.group(1).strip() if cat_match else "",
                 "content": body.strip(),
             })
 
@@ -168,7 +174,14 @@ def main():
                 "keyword": args.keyword,
                 "matches": len(results),
                 "results": [
-                    {"id": r["id"], "title": r["title"], "stars": r.get("stars", "")}
+                    {
+                        "id": r["id"],
+                        "title": r["title"],
+                        "stars": r.get("stars", ""),
+                        "type": r.get("type", ""),
+                        "category": r.get("category", ""),
+                        "content_preview": r.get("content", "")[:120],
+                    }
                     for r in results
                 ],
             }

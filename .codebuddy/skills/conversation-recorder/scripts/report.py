@@ -30,6 +30,17 @@ CATEGORIES = [
 ]
 
 
+def count_handbook_entries(project_root: str) -> int:
+    """统计经验手册中的经验条目数量。"""
+    handbook_path = os.path.join(project_root, "conversation-logs", "experience-handbook.md")
+    if not os.path.exists(handbook_path):
+        return 0
+    with open(handbook_path, "r", encoding="utf-8") as f:
+        content = f.read()
+    ids = set(re.findall(r"EXP-\d{8}-\d{2}|EXP-\d{3,}", content))
+    return len(ids)
+
+
 def parse_log_file(filepath: str) -> list[dict]:
     """解析单个日志 Markdown 文件，返回对话记录列表。"""
     if not os.path.exists(filepath):
@@ -219,6 +230,7 @@ def generate_weekly_data(project_root: str, date_str: str) -> dict:
         "active_days": active_days,
         "avg_per_day": round(total / active_days, 1) if active_days > 0 else 0,
         "total_experience": total_experience,
+        "experience_handbook_total": count_handbook_entries(project_root),
         "category_stats": category_stats,
         "daily_data": daily_data,
         "status_stats": {
@@ -240,12 +252,15 @@ def generate_monthly_data(project_root: str, date_str: str) -> dict:
     weekly_buckets = {}
     all_conversations = []
     total_experience = 0
+    active_days = 0
 
     day = first_day
     while day.month == month and day <= target_date:
         day_str = day.strftime("%Y-%m-%d")
         log_path = os.path.join(project_root, "conversation-logs", f"{day_str}.md")
         convs = parse_log_file(log_path)
+        if convs:
+            active_days += 1
         all_conversations.extend(convs)
 
         # 按周分桶
@@ -274,13 +289,26 @@ def generate_monthly_data(project_root: str, date_str: str) -> dict:
         pct = round(count / total * 100) if total > 0 else 0
         category_stats.append({"category": cat, "count": count, "percentage": pct})
 
+    status_counter = Counter(c["status"] for c in all_conversations)
+    normal = status_counter.get("normal", 0)
+    terminated = status_counter.get("terminated", 0)
+    interrupted = status_counter.get("interrupted", 0)
+
     return {
         "year": year,
         "month": month,
         "total_conversations": total,
+        "active_days": active_days,
         "total_experience": total_experience,
+        "experience_handbook_total": count_handbook_entries(project_root),
         "category_stats": category_stats,
         "weekly_breakdown": weekly_buckets,
+        "status_stats": {
+            "normal": normal,
+            "terminated": terminated,
+            "interrupted": interrupted,
+        },
+        "completion_rate": round(normal / total * 100, 1) if total > 0 else 100,
     }
 
 
